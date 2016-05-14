@@ -17,6 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.convert.decorateAsScala._
 import scala.collection.concurrent.Map
 import scala.collection.JavaConversions._
+import scala.collection.concurrent.TrieMap
 import scala.compat.java8.FutureConverters._
 import scala.compat.java8.OptionConverters._
 import scala.util.{Random => JRandom}
@@ -33,7 +34,7 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
   import ConsulServiceLocator._
 
   private val client = new ConsulClient(agentHostname, agentPort)
-  private val roundRobinIndexFor: Map[String, Int] = new ConcurrentHashMap[String, Int]().asScala
+  private val roundRobinIndexFor: Map[String, Int] = TrieMap.empty[String, Int]
 
   override def locate(name: String): CompletionStage[Optional[URI]] =
     locateAsScala(name).map(_.asJava).toJava
