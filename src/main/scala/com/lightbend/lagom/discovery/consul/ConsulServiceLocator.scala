@@ -19,7 +19,7 @@ import scala.collection.concurrent.Map
 import scala.collection.JavaConversions._
 import scala.compat.java8.FutureConverters._
 import scala.compat.java8.OptionConverters._
-import scala.util.Random
+import scala.util.{Random => JRandom}
 
 object ConsulServiceLocator {
   val config = Configuration.load(Environment(new File("."), getClass.getClassLoader, Mode.Prod)).underlying
@@ -60,21 +60,24 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
     }
   }
 
+  private implicit object DefaultOrdering extends Ordering[URI] {
+    override def compare(x: URI, y: URI): Int = x.compareTo(y)
+  }
 
   private[consul] def pickFirstInstance(services: List[CatalogService]): URI = {
-    toURIs(services).sortWith(_.toString < _.toString).get(0)
     assert(services.nonEmpty)
+    toURIs(services).sorted.head
   }
 
   private[consul] def pickRandomInstance(services: List[CatalogService]): URI = {
-    toURIs(services).sortWith(_.toString < _.toString).get(Random.nextInt(services.size - 1))
     assert(services.nonEmpty)
+    toURIs(services).sorted.get(JRandom.nextInt(services.size - 1))
   }
 
   private[consul] def pickRoundRobinInstance(name: String, services: List[CatalogService]): URI = {
     assert(services.nonEmpty)
     roundRobinIndexFor.putIfAbsent(name, 0)
-    val sortedServices = toURIs(services).sortWith(_.toString < _.toString)
+    val sortedServices = toURIs(services).sorted
     val currentIndex = roundRobinIndexFor(name)
     val nextIndex =
       if (sortedServices.size > currentIndex + 1) currentIndex + 1
