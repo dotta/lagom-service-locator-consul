@@ -1,39 +1,26 @@
 package com.lightbend.lagom.discovery.consul
 
-import java.io.File
-import java.net.{InetAddress, URI}
+import java.net.InetAddress
+import java.net.URI
 import java.util.Optional
-import java.util.concurrent.{ConcurrentHashMap, CompletionStage}
-import java.util.function.{Function => JFunction}
-import javax.inject.Inject
+import java.util.concurrent.CompletionStage
+import java.util.function.{ Function => JFunction }
 
-import com.ecwid.consul.v1.catalog.model.CatalogService
-import com.ecwid.consul.v1.{QueryParams, ConsulClient}
-import com.lightbend.lagom.javadsl.api.ServiceLocator
-import com.typesafe.config.ConfigException.BadValue
-import play.api.{Configuration, Environment, Mode}
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.collection.convert.decorateAsScala._
-import scala.collection.concurrent.Map
 import scala.collection.JavaConversions._
-import scala.collection.concurrent.TrieMap
+import scala.collection.concurrent.{ Map, TrieMap }
 import scala.compat.java8.FutureConverters._
 import scala.compat.java8.OptionConverters._
-import scala.util.{Random => JRandom}
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.{ Random => JRandom }
 
-object ConsulServiceLocator {
-  val config = Configuration.load(Environment(new File("."), getClass.getClassLoader, Mode.Prod)).underlying
-  val agentHostname = config.getString("lagom.discovery.consul.agent-hostname")
-  val agentPort     = config.getInt("lagom.discovery.consul.agent-port")
-  val scheme        = config.getString("lagom.discovery.consul.uri-scheme")
-  val routingPolicy = config.getString("lagom.discovery.consul.routing-policy")
-}
+import com.ecwid.consul.v1.{ ConsulClient, QueryParams }
+import com.ecwid.consul.v1.catalog.model.CatalogService
+import com.lightbend.lagom.javadsl.api.ServiceLocator
 
-class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends ServiceLocator {
-  import ConsulServiceLocator._
+import javax.inject.Inject
 
-  private val client = new ConsulClient(agentHostname, agentPort)
+class ConsulServiceLocator @Inject()(client: ConsulClient, config: ConsulConfig)(implicit ec: ExecutionContext) extends ServiceLocator {
+
   private val roundRobinIndexFor: Map[String, Int] = TrieMap.empty[String, Int]
 
   override def locate(name: String): CompletionStage[Optional[URI]] =
@@ -52,11 +39,10 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
       case 0 => None
       case 1 => toURIs(instances).headOption
       case _ =>
-        routingPolicy match {
-          case "first"       => Some(pickFirstInstance(instances))
-          case "random"      => Some(pickRandomInstance(instances))
-          case "round-robin" => Some(pickRoundRobinInstance(name, instances))
-          case unknown       => throw new BadValue("lagom.discovery.consul.routing-policy", s"[$unknown] is not a valid routing algorithm")
+        config.routingPolicy match {
+          case First      => Some(pickFirstInstance(instances))
+          case Random     => Some(pickRandomInstance(instances))
+          case RoundRobin => Some(pickRoundRobinInstance(name, instances))
         }
     }
   }
@@ -93,6 +79,6 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
       val serviceAddress =
         if (address.trim.isEmpty || address == "localhost") InetAddress.getLoopbackAddress.getHostAddress
         else address
-      new URI(s"$scheme://$serviceAddress:${service.getServicePort}")
+      new URI(s"${config.scheme}://$serviceAddress:${service.getServicePort}")
     }
 }
