@@ -62,17 +62,17 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
 
 
   private[consul] def pickFirstInstance(services: List[CatalogService]): URI = {
-    assert(services.size > 1)
     toURIs(services).sortWith(_.toString < _.toString).get(0)
+    assert(services.nonEmpty)
   }
 
   private[consul] def pickRandomInstance(services: List[CatalogService]): URI = {
-    assert(services.size > 1)
     toURIs(services).sortWith(_.toString < _.toString).get(Random.nextInt(services.size - 1))
+    assert(services.nonEmpty)
   }
 
   private[consul] def pickRoundRobinInstance(name: String, services: List[CatalogService]): URI = {
-    assert(services.size > 1)
+    assert(services.nonEmpty)
     roundRobinIndexFor.putIfAbsent(name, 0)
     val sortedServices = toURIs(services).sortWith(_.toString < _.toString)
     val currentIndex = roundRobinIndexFor(name)
