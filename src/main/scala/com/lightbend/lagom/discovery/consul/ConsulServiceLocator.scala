@@ -91,7 +91,7 @@ class ConsulServiceLocator @Inject()(implicit ec: ExecutionContext) extends Serv
     services.map { service =>
       val address = service.getServiceAddress
       val serviceAddress =
-        if (address == "" || address == "localhost") InetAddress.getLoopbackAddress.getHostAddress
+        if (address.trim.isEmpty || address == "localhost") InetAddress.getLoopbackAddress.getHostAddress
         else address
       new URI(s"$scheme://$serviceAddress:${service.getServicePort}")
     }
